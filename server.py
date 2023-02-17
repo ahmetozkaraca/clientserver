@@ -1,4 +1,6 @@
 import socket
+import threading
+from PySide2.QtCore import Signal,QObject
 
 MESSAGE_RESPONSES = {
     "Naber?": "İyi, sen?",
@@ -8,32 +10,46 @@ MESSAGE_RESPONSES = {
     "Uçuşa hazır mısınız?": "Daima hazır"
 }
 
-class Server:
+class Server(QObject):
+    new_message_signal = Signal(str,str)
+
     def __init__(self):
+        super().__init__()
         self.port = 12345
         self.host = socket.gethostname()
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-    def start_server(self):
+        self.server_active = True
+        self.new_message_signal.connect(self.send_answer)    
         self.server_socket.bind((self.host, self.port))
-        self.server_socket.listen() 
-        self.client_socket, self.client_address = self.server_socket.accept()
-
-        while True:
+    
+    def read_data(self,address):
+        client_active = True
+        address =str(address)
+        while client_active:
             try:
                 data = self.client_socket.recv(1024).decode()
-
-                if data in MESSAGE_RESPONSES:
-                     message = MESSAGE_RESPONSES[data]
-                else:
-                    message = 'bilinmeyen_soru'
-
-                self.client_socket.send(message.encode("utf-8"))
-
+                self.new_message_signal.emit(data,address)
             except :
-                pass
-            #     print("")
-                
+                client_active = False
+    
+    def handle_clients(self):
+        while self.server_active:
+            self.server_socket.listen() 
+            self.client_socket, self.client_address = self.server_socket.accept()
+            threading.Thread(target=self.read_data,daemon=True,args=(self.client_address,)).start()
 
-        # self.client_socket.close()
-        # self.server_socket.close()
+    def start_server(self):
+        threading.Thread(target=self.handle_clients,daemon=True).start()
+
+    def close_server(self):
+        self.server_active = False
+        self.server_socket.close()
+    
+    def send_answer(self,data):
+        if data in MESSAGE_RESPONSES:
+            answer = MESSAGE_RESPONSES[data]
+        else:
+            answer = 'bilinmeyen_soru'
+        
+        self.client_socket.send(answer.encode("utf-8"))
+            

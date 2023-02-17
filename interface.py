@@ -10,64 +10,40 @@ class MainWindow(QMainWindow):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         self.init_ui()
-        self.create_client()
-        self.create_server()
 
     def create_server(self):
         """
         Bu fonksiyon server başlatır.
         """
         self.server = Server()
-    
+        self.server.new_message_signal.connect(self.update_server_screen)
+
+    def start_server(self):
+        self.server.start_server()
+
     def create_client(self):
         self.client = Client()
-
-    def start_requirements_server(self):
-        
-        threading.Thread(target=self.server.start_server, daemon=True).start()
-        # self.server.start_server()
-
-    def start_requirements_client(self):
-
-        threading.Thread(target=self.client.start_client, daemon=True).start()
+        self.client.new_message_signal.connect(self.update_client_screen)
 
     def init_ui(self):
-        
-        self.ui.pushButtonGnder.clicked.connect(self.send_message)
-        self.ui.pushButtonsil.clicked.connect(self.clear)
-        self.ui.pushButtonkes.clicked.connect(self.close_connection)
-        self.ui.pushButtonbaglan.clicked.connect(self.reconnect) 
-        
-                
-
-    def clear(self):
-        self.client.disconnect()
+        self.ui.pushButtonGnder.clicked.connect(lambda:self.client.send_message(self.ui.answer_lineEdit.text()))
+        self.ui.pushButtonsil.clicked.connect(self.clear_all_screen)
+        self.ui.pushButtonkes.clicked.connect(self.close_client_connection)
+        self.ui.pushButtonbaglan.clicked.connect(self.client_connect) 
+            
+    def clear_all_screen(self):
         self.ui.plainTextEdit_2Client.setPlainText("")
         self.ui.plainTextEditServer.setPlainText("")
 
+    def close_client_connection(self):
+        self.client.close()
 
-    def send_message(self):
-       
-        self.message = self.ui.answer_lineEdit.text()
-        self.ui.answer_lineEdit.setText("")
-        self.client.client_socket.send(self.message.encode('utf-8'))
-        self.ui.plainTextEdit_2Client.appendPlainText(self.message)
-        answer = self.client.client_socket.recv(1024).decode('utf-8')
-        self.ui.plainTextEditServer.appendPlainText(answer)
-            
-        # except  OSError:
-            # self.ui.plainTextEdit_2Client.setPlainText("")
+    def client_connect(self):
+        self.create_client()
+        self.client.start_client()
 
-    def close_connection(self):
-        self.client.disconnect()
-        self.ui.plainTextEdit_2Client.appendPlainText('Bağlantı kesildi')
+    def update_server_screen(self,data,address):
+        self.ui.plainTextEditServer.appendPlainText(f"{address}: {data}")
 
-    def reconnect(self):
-        
-            self.client.disconnect()
-            self.create_client()
-            self.start_requirements_client()
-        # self.start_requirements_server()
-            self.ui.plainTextEditServer.appendPlainText('Bağlandı')
-
-         
+    def update_client_screen(self,data):
+        self.ui.plainTextEdit_2Client.appendPlainText(data)
